@@ -1,5 +1,7 @@
 const express = require('express')
 
+const bodyParser = require('body-parser')
+
 const admin = require("firebase-admin");
 
 const Web3 = require("web3");
@@ -110,14 +112,14 @@ const getJWT = async (req, res) => {
     }
 
     // Delete messageToSign as it can only be used once
-    admin.firestore().collection("users").doc(address).set(
-      {
-        messageToSign: null,
-      },
-      {
-        merge: true,
-      }
-    );
+    // admin.firestore().collection("users").doc(address).set(
+    //   {
+    //     messageToSign: null,
+    //   },
+    //   {
+    //     merge: true,
+    //   }
+    // );
 
     return res.send({ customToken, error: null });
   } catch (err) {
@@ -126,12 +128,51 @@ const getJWT = async (req, res) => {
   }
 };
 
+const saveInfo = async(req, res) => {
+  try {
+    const { address, signature , customToken } = req.body;
+    admin.firestore().collection("users").doc(address).set(
+      {
+        signature,
+        customToken
+      },
+      {
+        merge: true,
+      }
+    );
+    return res.send({ error: null });
+  } catch (error) {
+    
+  }
+}
+
+const getUser = async (req, res) => {
+  try {
+    const { address } = req.query;
+    const user = await admin.firestore().collection("users").doc(address).get();
+    if(user) {
+      const signature = user.data().signature
+      const customToken = user.data().customToken
+      const add = user.data().address
+      const userRes = {address: add,signature,customToken}
+      return res.send(userRes);
+    } else {
+      return res.send({ error: null });
+    }
+  } catch (error) {
+    
+  }
+}
+
 const cors = require('cors')
 
 const app = express()
 const port = 4000
 
 app.use(cors())
+
+app.use(bodyParser.json({ limit: '50mb' }))
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true, parameterLimit: 50000 }))
 
 app.get('/', (req, res) => {
   res.send('Hello World!')
@@ -140,6 +181,10 @@ app.get('/', (req, res) => {
 app.get("/message", getMessageToSign);
 
 app.get("/jwt", getJWT);
+
+app.post("/signature", saveInfo);
+
+app.get("/user", getUser);
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`)
